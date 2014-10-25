@@ -1,0 +1,76 @@
+---
+title: "Data Mining on Bank Marketing Data"
+author: "Stephan Sprenger"
+date: "25 October 2014"
+output: html_document
+---
+
+# Introduction
+
+The data investigated in this small workbook goes back to _S. Moro, P. Cortez and P. Rita. A Data-Driven Approach to Predict the Success of Bank Telemarketing. Decision Support Systems, Elsevier, 62:22-31, June 2014_  
+The data is available from the [UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/datasets/Bank+Marketing)
+
+The purpose of this workbook to apply different machine learning algorithms to the data problem. The software ```R``` will be used in conjunction with the package ```caret```.
+
+
+# Data Preparation
+
+The data is being loaded. Investigation shows that the financial indicators are factor, while we would want to have them as numeric for analysis. Therefore this data is transformed.
+We also understand that there are "unknown" data. We will replace these with NAs.
+The variable ```pdays``` has a value of 999 for 'not available'; wee will set this to NA as well.
+
+
+```{r load data}
+bank.raw <- read.csv2(file="bank-additional-full.csv")
+str(bank.raw)
+bank <- bank.raw
+bank[,16:20] <- apply(bank[,16:20], 2, function (x) as.numeric(as.character(x)))
+bank[bank=="unknown"] <- NA
+bank <- droplevels(bank)
+bank[bank$pdays==999,"pdays"] <- NA
+summary(bank)
+names(bank)[names(bank)=="y"] <- "success"
+```
+
+# Data Exploration
+
+```{r explo}
+library(vcd)
+mosaic(  ~  success+poutcome, data=bank, shade=TRUE, main="Success of campaign vs previous successes")
+hist(bank$euribor3m)
+library(ggplot2)
+ggplot(data=bank, aes(x=euribor3m, fill=success)) + geom_histogram(alpha=0.5, position="dodge")
+```
+
+# Modelling
+
+```{r modeling}
+library(caret)
+
+bank.train.data <- bank[,-21]
+bank.train.class <- bank[,21]
+
+cvCtrl <- trainControl(method="cv", classProbs=TRUE, summaryFunction=twoClassSummary)
+
+fit.rpart <- train(bank.train.data, bank.train.class, method="rpart", trControl=cvCtrl, metric="ROC")
+fit.rpart <- train(success ~ duration, data=bank, method="rpart")
+fit.rpart
+fit.rpart$finalModel
+predict.rpart <- predict(fit.rpart)
+confusionMatrix(predict.rpart, bank.train.class, positive="yes")
+predict.rpart <- predict(fit.rpart, type = "prob")
+auc(bank.train.class, predict.rpart$yes)
+plot.roc(bank.train.class, predict.rpart$yes)
+
+fit.c50 <- train(bank.train.data, bank.train.class, method="C5.0", trControl=cvCtrl, metric="ROC")
+fit.c50
+fit.c50$finalModel
+predict.c50 <- predict(fit.c50)
+confusionMatrix(predict.c50, bank.train.class, positive="yes")
+predict.c50 <- predict(fit.c50, type = "prob")
+auc(bank.train.class, predict.c50$yes)
+plot.roc(bank.train.class, predict.c50$yes)
+
+
+```
+
