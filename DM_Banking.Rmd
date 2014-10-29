@@ -16,20 +16,35 @@ The purpose of this workbook to apply different machine learning algorithms to t
 # Data Preparation
 
 The data is being loaded. Investigation shows that the financial indicators are factor, while we would want to have them as numeric for analysis. Therefore this data is transformed.
-We also understand that there are "unknown" data. We will replace these with NAs.
-The variable ```pdays``` has a value of 999 for 'not available'; wee will set this to NA as well.
+We also understand that there are "unknown" data in several variables. We could replace these with NAs; however some algorithms (like Naive Bayes) would struggle. Given that on some of these variables there are many unknowns (like for ```pdays```) we will leave the unknown observations as an own category "unknown". 
 
+The variable ```pdays``` has a value of 999 for 'not available'; wee will set this to "unknown" as well.
+
+Also, the variable ```duration``` indicates the length of a call. this is interesting for analysis, but difficult for prediction: In a prediction task we do not know before the call how long it will take.  
+Therefore ```duration``` is being excluded from the set of predictors; this seems to be different from a lot of other research on this data set.  
+
+Also the data set is split into a training-set and a test set. 
 
 ```{r load data}
+library(caret)
 bank.raw <- read.csv2(file="bank-additional-full.csv")
 str(bank.raw)
 bank <- bank.raw
 bank[,16:20] <- apply(bank[,16:20], 2, function (x) as.numeric(as.character(x)))
-bank[bank=="unknown"] <- NA
+#bank[bank=="unknown"] <- NA
 bank <- droplevels(bank)
-bank[bank$pdays==999,"pdays"] <- NA
+bank[bank$pdays==999,"pdays"] <- "unknown"
+bank$pdays <- as.factor(bank$pdays)
 summary(bank)
 names(bank)[names(bank)=="y"] <- "success"
+bank$success <- factor(bank$success, levels=c("yes", "no"))
+
+bank <- subset(bank, select=-c(duration))
+
+trainIndex <- createDataPartition(bank$success, p=0.8, list=FALSE, times=1)
+bank.train <- bank[trainIndex,]
+bank.test <- bank[-trainIndex,]
+
 ```
 
 # Data Exploration
@@ -45,32 +60,87 @@ ggplot(data=bank, aes(x=euribor3m, fill=success)) + geom_histogram(alpha=0.5, po
 # Modelling
 
 ```{r modeling}
-library(caret)
+Sys.time()
+bank.train.data <- subset(bank.train, select=-c(success))
+bank.train.class <- subset(bank.train, select=c(success), drop=TRUE)
 
-bank.train.data <- bank[,-21]
-bank.train.class <- bank[,21]
+cvCtrl <- trainControl(method="cv", classProbs=TRUE, summaryFunction=twoClassSummary, verboseIter=TRUE)
+#splCtrl <- trainControl(method="none", classProbs = TRUE)
 
-cvCtrl <- trainControl(method="cv", classProbs=TRUE, summaryFunction=twoClassSummary)
 
-fit.rpart <- train(bank.train.data, bank.train.class, method="rpart", trControl=cvCtrl, metric="ROC")
-fit.rpart <- train(success ~ duration, data=bank, method="rpart")
+fit.rpart <- train(bank.train.data, bank.train.class, method="rpart", trControl=cvCtrl, metric="ROC", tuneLength = 10)
+#fit.rpart <- train(success ~ duration, data=bank, method="rpart")
 fit.rpart
 fit.rpart$finalModel
+#summary(fit.rpart)
 predict.rpart <- predict(fit.rpart)
 confusionMatrix(predict.rpart, bank.train.class, positive="yes")
 predict.rpart <- predict(fit.rpart, type = "prob")
-auc(bank.train.class, predict.rpart$yes)
-plot.roc(bank.train.class, predict.rpart$yes)
+(auc.rpart <- auc(bank.train.class, predict.rpart$yes))
 
-fit.c50 <- train(bank.train.data, bank.train.class, method="C5.0", trControl=cvCtrl, metric="ROC")
+fit.c50 <- train(bank.train.data, bank.train.class, method="C5.0", trControl=cvCtrl, metric="ROC", tuneLength = 10)
 fit.c50
-fit.c50$finalModel
+#fit.c50$finalModel
+summary(fit.c50)
 predict.c50 <- predict(fit.c50)
 confusionMatrix(predict.c50, bank.train.class, positive="yes")
 predict.c50 <- predict(fit.c50, type = "prob")
-auc(bank.train.class, predict.c50$yes)
-plot.roc(bank.train.class, predict.c50$yes)
+(auc.c50 <- auc(bank.train.class, predict.c50$yes))
 
 
+fit.ctree <- train(bank.train.data, bank.train.class, method="ctree", trControl=cvCtrl, metric="ROC")
+predict.ctree <- predict(fit.ctree)
+confusionMatrix(predict.ctree, bank.train.class, positive="yes")
+predict.ctree <- predict(fit.ctree, type = "prob")
+(auc.ctree <- auc(bank.train.class, predict.ctree$yes))
+
+
+fit.nb <- train(bank.train.data, bank.train.class, method="nb", trControl=cvCtrl, metric="ROC")
+predict.nb <- predict(fit.nb)
+confusionMatrix(predict.nb, bank.train.class, positive="yes")
+predict.nb <- predict(fit.nb, type = "prob")
+(auc.nb <- auc(bank.train.class, predict.nb$yes))
+
+Sys.time()
+fit.svm <- train(success ~ . , data=bank.train, method="svmLinear", trControl=cvCtrl, metric="ROC")
+predict.svm <- predict(fit.svm)
+confusionMatrix(predict.svm, bank.train.class, positive="yes")
+predict.svm <- predict(fit.svm, type = "prob")
+(auc.svm <- auc(bank.train.class, predict.svm$yes))
+
+fit.lr <- train(bank.train.data, bank.train.class, method="mlp", trControl=cvCtrl, metric="ROC")
+1predict.lr <- predict(fit.nb)
+confusionMatrix(predict.nb, bank.train.class, positive="yes")
+predict.nb <- predict(fit.nb, type = "prob")
+(auc.nb <- auc(bank.train.class, predict.nb$yes))
+
+
+
+plot.roc(bank.train.class, predict.rpart$yes, col="green")
+lines.roc(bank.train.class, predict.c50$yes, col="blue")
+lines.roc(bank.train.class, predict.ctree$yes, col="pink")
+lines.roc(bank.train.class, predict.nb$yes, col="red")
+lines.roc(bank.train.class, predict.svm$yes, col="orange")
+legend("bottomright", legend=c("CART", "C50", "Cond. Inference Trees", "Naive Bayes", "SVM"), col=c("green", "blue", "pink", "red", "orange"), lwd=2)
+
+Sys.time()
+
+```
+
+
+
+```{r compare}
+#compare different models
+modelObjects <- list(cart=fit.rpart,
+                     c50=fit.c50,
+                     ctree=fit.ctree)
+#predict(modelObjects, churnTrain)
+
+x <- data.frame(ROC=sort(sapply(modelObjects, function(x) max(x$results$ROC)), decreasing=TRUE))
+x
+# variances in resamples.
+cvValues <- resamples(list(CART=fit.rpart, C50=fit.c50, ctree=fit.ctree))
+summary(cvValues)
+dotplot(cvValues)
 ```
 
