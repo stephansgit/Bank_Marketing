@@ -23,13 +23,14 @@ The variable ```pdays``` has a value of 999 for 'not available'; wee will set th
 Also, the variable ```duration``` indicates the length of a call. this is interesting for analysis, but difficult for prediction: In a prediction task we do not know before the call how long it will take.  
 Therefore ```duration``` is being excluded from the set of predictors; this seems to be different from a lot of other research on this data set.  
 
-Also the data set is split into a training-set and a test set. 
+Also the data set is split into a training set (80%) and a test set (20%). 
 
 ```{r load data}
 library(caret)
 bank.raw <- read.csv2(file="bank-additional-full.csv")
 str(bank.raw)
 bank <- bank.raw
+bank$job <- gsub("\\-", "", bank$job)
 bank[,16:20] <- apply(bank[,16:20], 2, function (x) as.numeric(as.character(x)))
 #bank[bank=="unknown"] <- NA
 bank <- droplevels(bank)
@@ -48,6 +49,8 @@ bank.test <- bank[-trainIndex,]
 ```
 
 # Data Exploration
+
+Visual exploration 
 
 ```{r explo}
 library(vcd)
@@ -102,11 +105,14 @@ predict.nb <- predict(fit.nb, type = "prob")
 (auc.nb <- auc(bank.train.class, predict.nb$yes))
 
 Sys.time()
-fit.svm <- train(success ~ . , data=bank.train, method="svmLinear", trControl=cvCtrl, metric="ROC")
-predict.svm <- predict(fit.svm)
-confusionMatrix(predict.svm, bank.train.class, positive="yes")
-predict.svm <- predict(fit.svm, type = "prob")
-(auc.svm <- auc(bank.train.class, predict.svm$yes))
+fit.logit <- train(success ~ . , data=bank.train, method="glm", family=binomial, trControl=cvCtrl, metric="ROC", tuneLength = 10)
+predict.logit <- predict(fit.logit)
+confusionMatrix(predict.logit, bank.train.class, positive="yes")
+predict.logit <- predict(fit.logit, type = "prob")
+(auc.logit <- auc(bank.train.class, predict.logit$yes))
+
+x <- glm(success~., family=binomial, data=bank.train)
+predict(x)
 
 fit.lr <- train(bank.train.data, bank.train.class, method="mlp", trControl=cvCtrl, metric="ROC")
 1predict.lr <- predict(fit.nb)
@@ -120,10 +126,13 @@ plot.roc(bank.train.class, predict.rpart$yes, col="green")
 lines.roc(bank.train.class, predict.c50$yes, col="blue")
 lines.roc(bank.train.class, predict.ctree$yes, col="pink")
 lines.roc(bank.train.class, predict.nb$yes, col="red")
-lines.roc(bank.train.class, predict.svm$yes, col="orange")
-legend("bottomright", legend=c("CART", "C50", "Cond. Inference Trees", "Naive Bayes", "SVM"), col=c("green", "blue", "pink", "red", "orange"), lwd=2)
+lines.roc(bank.train.class, predict.logit$yes, col="orange")
+legend("bottomright", legend=c("CART", "C50", "Cond. Inference Trees", "Naive Bayes", "Logit"), col=c("green", "blue", "pink", "red", "orange"), lwd=2)
 
 Sys.time()
+plot(varImp(fit.rpart))
+plot(varImp(fit.c50))
+plot(varImp(fit.ctree))
 
 ```
 
