@@ -30,7 +30,7 @@ library(caret)
 bank.raw <- read.csv2(file="bank-additional-full.csv")
 str(bank.raw)
 bank <- bank.raw
-bank$job <- gsub("\\-", "", bank$job)
+bank$job <- factor(gsub("\\-", "", bank$job))
 bank[,16:20] <- apply(bank[,16:20], 2, function (x) as.numeric(as.character(x)))
 #bank[bank=="unknown"] <- NA
 bank <- droplevels(bank)
@@ -64,8 +64,11 @@ ggplot(data=bank, aes(x=euribor3m, fill=success)) + geom_histogram(alpha=0.5, po
 
 ```{r modeling}
 Sys.time()
-bank.train.data <- subset(bank.train, select=-c(success))
+bank.train.data <- subset(bank.train, select=-c(success), drop=TRUE)
 bank.train.class <- subset(bank.train, select=c(success), drop=TRUE)
+bank.test.data <- subset(bank.test, select=-c(success), drop=TRUE)
+bank.test.class <- subset(bank.test, select=c(success), drop=TRUE)
+
 
 cvCtrl <- trainControl(method="cv", classProbs=TRUE, summaryFunction=twoClassSummary, verboseIter=TRUE)
 #splCtrl <- trainControl(method="none", classProbs = TRUE)
@@ -89,6 +92,8 @@ predict.c50 <- predict(fit.c50)
 confusionMatrix(predict.c50, bank.train.class, positive="yes")
 predict.c50 <- predict(fit.c50, type = "prob")
 (auc.c50 <- auc(bank.train.class, predict.c50$yes))
+predict.c50 <- predict(fit.c50, bank.test.data, type="prob")
+(auc.c50 <- auc(bank.test.class, predict.c50$yes))
 
 
 fit.ctree <- train(bank.train.data, bank.train.class, method="ctree", trControl=cvCtrl, metric="ROC")
@@ -96,37 +101,49 @@ predict.ctree <- predict(fit.ctree)
 confusionMatrix(predict.ctree, bank.train.class, positive="yes")
 predict.ctree <- predict(fit.ctree, type = "prob")
 (auc.ctree <- auc(bank.train.class, predict.ctree$yes))
+predict.ctree <- predict(fit.ctree, bank.test.data, type="prob")
+(auc.ctree <- auc(bank.test.class, predict.ctree$yes))
 
 
-fit.nb <- train(bank.train.data, bank.train.class, method="nb", trControl=cvCtrl, metric="ROC")
-predict.nb <- predict(fit.nb)
-confusionMatrix(predict.nb, bank.train.class, positive="yes")
-predict.nb <- predict(fit.nb, type = "prob")
-(auc.nb <- auc(bank.train.class, predict.nb$yes))
+
+# fit.nb <- train(bank.train.data, bank.train.class, method="nb", trControl=cvCtrl, metric="ROC")
+# predict.nb <- predict(fit.nb)
+# confusionMatrix(predict.nb, bank.train.class, positive="yes")
+# predict.nb <- predict(fit.nb, type = "prob")
+# (auc.nb <- auc(bank.train.class, predict.nb$yes))
 
 Sys.time()
-fit.logit <- train(success ~ . , data=bank.train, method="glm", family=binomial, trControl=cvCtrl, metric="ROC", tuneLength = 10)
-predict.logit <- predict(fit.logit)
+bank.train.dummy <- predict(dummyVars(success ~ . ,data=bank.train), newdata=bank.train)
+bank.train.dummy <- data.frame(bank.train.dummy, success=factor(bank.train$success))
+bank.test.dummy <- predict(dummyVars(success ~ . ,data=bank.test), newdata=bank.test)
+bank.test.dummy <- data.frame(bank.test.dummy, success=factor(bank.test$success))
+
+
+fit.logit <- train(success ~ ., data=bank.train.dummy, method="glm", family=binomial, trControl=cvCtrl, metric="ROC", tuneLength=1)
+predict.logit <- predict.train(fit.logit)
 confusionMatrix(predict.logit, bank.train.class, positive="yes")
 predict.logit <- predict(fit.logit, type = "prob")
 (auc.logit <- auc(bank.train.class, predict.logit$yes))
 
-x <- glm(success~., family=binomial, data=bank.train)
-predict(x)
-
-fit.lr <- train(bank.train.data, bank.train.class, method="mlp", trControl=cvCtrl, metric="ROC")
-1predict.lr <- predict(fit.nb)
-confusionMatrix(predict.nb, bank.train.class, positive="yes")
-predict.nb <- predict(fit.nb, type = "prob")
-(auc.nb <- auc(bank.train.class, predict.nb$yes))
+predict.logit <- predict(fit.logit, bank.test.dummy, type="prob")
+(auc.logit <- auc(bank.test.dummy$success, predict.logit$yes))
 
 
 
-plot.roc(bank.train.class, predict.rpart$yes, col="green")
-lines.roc(bank.train.class, predict.c50$yes, col="blue")
-lines.roc(bank.train.class, predict.ctree$yes, col="pink")
-lines.roc(bank.train.class, predict.nb$yes, col="red")
-lines.roc(bank.train.class, predict.logit$yes, col="orange")
+
+# fit.lr <- train(bank.train.data, bank.train.class, method="mlp", trControl=cvCtrl, metric="ROC")
+# 1predict.lr <- predict(fit.nb)
+# confusionMatrix(predict.nb, bank.train.class, positive="yes")
+# predict.nb <- predict(fit.nb, type = "prob")
+# (auc.nb <- auc(bank.train.class, predict.nb$yes))
+
+
+
+plot.roc(bank.test.class, predict.rpart$yes, col="green")
+lines.roc(bank.test.class, predict.c50$yes, col="blue")
+lines.roc(bank.test.class, predict.ctree$yes, col="pink")
+lines.roc(bank.test.class, predict.nb$yes, col="red")
+lines.roc(bank.test.class, predict.logit$yes, col="orange")
 legend("bottomright", legend=c("CART", "C50", "Cond. Inference Trees", "Naive Bayes", "Logit"), col=c("green", "blue", "pink", "red", "orange"), lwd=2)
 
 Sys.time()
@@ -142,13 +159,14 @@ plot(varImp(fit.ctree))
 #compare different models
 modelObjects <- list(cart=fit.rpart,
                      c50=fit.c50,
-                     ctree=fit.ctree)
+                     ctree=fit.ctree,
+                     logit=fit.logit)
 #predict(modelObjects, churnTrain)
 
 x <- data.frame(ROC=sort(sapply(modelObjects, function(x) max(x$results$ROC)), decreasing=TRUE))
 x
 # variances in resamples.
-cvValues <- resamples(list(CART=fit.rpart, C50=fit.c50, ctree=fit.ctree))
+cvValues <- resamples(list(CART=fit.rpart, C50=fit.c50, ctree=fit.ctree, logit=fit.logit))
 summary(cvValues)
 dotplot(cvValues)
 ```
