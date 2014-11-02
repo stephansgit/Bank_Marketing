@@ -8,19 +8,23 @@ output: html_document
 # Introduction
 
 The data investigated in this small workbook goes back to _S. Moro, P. Cortez and P. Rita. A Data-Driven Approach to Predict the Success of Bank Telemarketing. Decision Support Systems, Elsevier, 62:22-31, June 2014_  
-The data is available from the [UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/datasets/Bank+Marketing)
+The data is available from the [UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/datasets/Bank+Marketing). Several data sets are available; we will use the ```bank-additional-full.csv```.
+An earlier paper from the authors is _Moro, Cortez, Laureano: A data mining approach for bank telemarketing using the rminer package and r tool_ [here](http://bru-unide.iscte.pt/RePEc/pdfs/13-06.pdf).
 
 The purpose of this workbook to apply different machine learning algorithms to the data problem. The software ```R``` will be used in conjunction with the package ```caret```.
 
 
 # Data Preparation
 
-The data is being loaded. Investigation shows that the financial indicators are factor, while we would want to have them as numeric for analysis. Therefore this data is transformed.
-We also understand that there are "unknown" data in several variables. We could replace these with NAs; however some algorithms (like Naive Bayes) would struggle. Given that on some of these variables there are many unknowns (like for ```pdays```) we will leave the unknown observations as an own category "unknown". 
+The data is being loaded (agian, we will use the ```bank-additional-full.csv```).  
+Investigation shows that the data needs to be prepared for analysis.
+The following steps are performed:
 
-The variable ```pdays``` has a value of 999 for 'not available'; wee will set this to "unknown" as well.
+* the financial indicators are "factor"", while we would want to have them as numeric for analysis. Therefore this data is transformed.
+* We also understand that there are "unknown" data in several variables. We could replace these with NAs; however some algorithms (like Naive Bayes) would struggle. Given that on some of these variables there are many unknowns (like for ```pdays```) we will leave the unknown observations as an own category "unknown".   
+* The variable ```pdays``` has a value of 999 for 'not available'; wee will set this to "unknown" as well.
 
-Also, the variable ```duration``` indicates the length of a call. this is interesting for analysis, but difficult for prediction: In a prediction task we do not know before the call how long it will take.  
+One important change we make is with regards to the the variable ```duration```. It indicates the length of a call. This might be interesting for analysis, but difficult for prediction: In a prediction task we do not know the duration of the call before it actually takes place.  
 Therefore ```duration``` is being excluded from the set of predictors; this seems to be different from a lot of other research on this data set.  
 
 Also the data set is split into a training set (80%) and a test set (20%). 
