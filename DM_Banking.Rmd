@@ -79,19 +79,17 @@ cvCtrl <- trainControl(method="cv", classProbs=TRUE, summaryFunction=twoClassSum
 
 
 fit.rpart <- train(bank.train.data, bank.train.class, method="rpart", trControl=cvCtrl, metric="ROC", tuneLength = 10)
-#fit.rpart <- train(success ~ duration, data=bank, method="rpart")
-fit.rpart
-fit.rpart$finalModel
-#summary(fit.rpart)
 predict.rpart <- predict(fit.rpart)
 confusionMatrix(predict.rpart, bank.train.class, positive="yes")
 predict.rpart <- predict(fit.rpart, type = "prob")
 (auc.rpart <- auc(bank.train.class, predict.rpart$yes))
+predict.rpart <- predict(fit.rpart, bank.test.data, type = "prob")
+(auc.rpart <- auc(bank.test.class, predict.rpart$yes))
 
-fit.c50 <- train(bank.train.data, bank.train.class, method="C5.0", trControl=cvCtrl, metric="ROC", tuneLength = 10)
-fit.c50
-#fit.c50$finalModel
-summary(fit.c50)
+
+
+#fit.c50 <- train(bank.train.data, bank.train.class, method="C5.0", trControl=cvCtrl, metric="ROC", tuneLength = 10)
+load(file="C50_CV_10Iter.RData")
 predict.c50 <- predict(fit.c50)
 confusionMatrix(predict.c50, bank.train.class, positive="yes")
 predict.c50 <- predict(fit.c50, type = "prob")
@@ -100,7 +98,8 @@ predict.c50 <- predict(fit.c50, bank.test.data, type="prob")
 (auc.c50 <- auc(bank.test.class, predict.c50$yes))
 
 
-fit.ctree <- train(bank.train.data, bank.train.class, method="ctree", trControl=cvCtrl, metric="ROC")
+#fit.ctree <- train(bank.train.data, bank.train.class, method="ctree", trControl=cvCtrl, metric="ROC")
+load(file = "Ctree_CV_10Iter.RData")
 predict.ctree <- predict(fit.ctree)
 confusionMatrix(predict.ctree, bank.train.class, positive="yes")
 predict.ctree <- predict(fit.ctree, type = "prob")
@@ -108,39 +107,39 @@ predict.ctree <- predict(fit.ctree, type = "prob")
 predict.ctree <- predict(fit.ctree, bank.test.data, type="prob")
 (auc.ctree <- auc(bank.test.class, predict.ctree$yes))
 
-
-
-# fit.nb <- train(bank.train.data, bank.train.class, method="nb", trControl=cvCtrl, metric="ROC")
-# predict.nb <- predict(fit.nb)
-# confusionMatrix(predict.nb, bank.train.class, positive="yes")
-# predict.nb <- predict(fit.nb, type = "prob")
-# (auc.nb <- auc(bank.train.class, predict.nb$yes))
-
-Sys.time()
 bank.train.dummy <- predict(dummyVars(success ~ . ,data=bank.train), newdata=bank.train)
 bank.train.dummy <- data.frame(bank.train.dummy, success=factor(bank.train$success))
 bank.test.dummy <- predict(dummyVars(success ~ . ,data=bank.test), newdata=bank.test)
 bank.test.dummy <- data.frame(bank.test.dummy, success=factor(bank.test$success))
 
 
-fit.logit <- train(success ~ ., data=bank.train.dummy, method="glm", family=binomial, trControl=cvCtrl, metric="ROC", tuneLength=1)
+#fit.logit <- train(success ~ ., data=bank.train.dummy, method="glm", family=binomial, trControl=cvCtrl, metric="ROC", tuneLength=1)
+load(file = "Logit_CV_10Iter.RData")
 predict.logit <- predict.train(fit.logit)
 confusionMatrix(predict.logit, bank.train.class, positive="yes")
 predict.logit <- predict(fit.logit, type = "prob")
-(auc.logit <- auc(bank.train.class, predict.logit$yes))
-
+(auc.logit <- auc(bank.train.dummy$success, predict.logit$yes))
 predict.logit <- predict(fit.logit, bank.test.dummy, type="prob")
 (auc.logit <- auc(bank.test.dummy$success, predict.logit$yes))
 
+#fit.nb <- train(bank.train.data, bank.train.class, method="nb", trControl=cvCtrl, metric="ROC", tuneLength=10)
+load(file = "NB_CV_10Iter.RData")
+predict.nb <- predict(fit.nb)
+confusionMatrix(predict.nb, bank.train.class, positive="yes")
+predict.nb <- predict(fit.nb, type = "prob")
+(auc.nb <- auc(bank.train.class, predict.nb$yes))
+predict.nb <- predict(fit.nb, bank.test.data, type="prob")
+(auc.nb <- auc(bank.test.class, predict.nb$yes))
 
 
-
-# fit.lr <- train(bank.train.data, bank.train.class, method="mlp", trControl=cvCtrl, metric="ROC")
-# 1predict.lr <- predict(fit.nb)
-# confusionMatrix(predict.nb, bank.train.class, positive="yes")
-# predict.nb <- predict(fit.nb, type = "prob")
-# (auc.nb <- auc(bank.train.class, predict.nb$yes))
-
+#fit.nn <- train(success ~ ., data=bank.train.dummy, method="nnet", trControl=cvCtrl, metric="ROC", tuneLength=10)
+load(file = "NN_CV_10Iter.RData")
+predict.nn <- predict(fit.nn)
+confusionMatrix(predict.nn, bank.train.class, positive="yes")
+predict.nn <- predict(fit.nn, type = "prob")
+(auc.nn <- auc(bank.train.class, predict.nn$yes))
+predict.nn <- predict(fit.nn, bank.test.dummy, type="prob")
+(auc.nn <- auc(bank.test.class, predict.nn$yes))
 
 
 plot.roc(bank.test.class, predict.rpart$yes, col="green")
@@ -148,13 +147,22 @@ lines.roc(bank.test.class, predict.c50$yes, col="blue")
 lines.roc(bank.test.class, predict.ctree$yes, col="pink")
 lines.roc(bank.test.class, predict.nb$yes, col="red")
 lines.roc(bank.test.class, predict.logit$yes, col="orange")
-legend("bottomright", legend=c("CART", "C50", "Cond. Inference Trees", "Naive Bayes", "Logit"), col=c("green", "blue", "pink", "red", "orange"), lwd=2)
+lines.roc(bank.test.class, predict.nn$yes, col="cyan")
+legend("bottomright", legend=c("CART", "C50", "Cond. Inference Trees", "Naive Bayes", "Logit", "Neural Net"), col=c("green", "blue", "pink", "red", "orange", "cyan"), lwd=2, cex=0.5)
+
+library(dplyr)
+auc <- rbind(C50=auc.c50, CART=auc.rpart, ctree=auc.ctree, Logit=auc.logit, NaiveBayes=auc.nb, NeuralNet=auc.nn)
+auc <- data.frame(Model=row.names(auc), AUC=auc)
+(auc <- arrange(auc, desc(AUC)))
+
 
 Sys.time()
 plot(varImp(fit.rpart))
 plot(varImp(fit.c50))
 plot(varImp(fit.ctree))
-
+plot(varImp(fit.nb))
+plot(varImp(fit.logit))
+plot(varImp(fit.nn))
 ```
 
 
@@ -164,13 +172,15 @@ plot(varImp(fit.ctree))
 modelObjects <- list(cart=fit.rpart,
                      c50=fit.c50,
                      ctree=fit.ctree,
-                     logit=fit.logit)
+                     nb=fit.nb,
+                     logit=fit.logit,
+                     nn=fit.nn)
 #predict(modelObjects, churnTrain)
 
 x <- data.frame(ROC=sort(sapply(modelObjects, function(x) max(x$results$ROC)), decreasing=TRUE))
 x
 # variances in resamples.
-cvValues <- resamples(list(CART=fit.rpart, C50=fit.c50, ctree=fit.ctree, logit=fit.logit))
+cvValues <- resamples(list(CART=fit.rpart, C50=fit.c50, ctree=fit.ctree, logit=fit.logit, naivebayes=fit.nb, neuralnet=fit.nn))
 summary(cvValues)
 dotplot(cvValues)
 ```
