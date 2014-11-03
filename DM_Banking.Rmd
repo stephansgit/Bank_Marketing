@@ -2,7 +2,9 @@
 title: "Data Mining on Bank Marketing Data"
 author: "Stephan Sprenger"
 date: "25 October 2014"
-output: html_document
+output: 
+  html_document:
+  pandoc_args: [ +RTS, -K64m, -RTS ]
 ---
 
 # Introduction
@@ -16,11 +18,11 @@ The purpose of this workbook to apply different machine learning algorithms to t
 
 # Data Preparation
 
-The data is being loaded (agian, we will use the ```bank-additional-full.csv```).  
+The data is being loaded (again, we will use the ```bank-additional-full.csv```).  
 Investigation shows that the data needs to be prepared for analysis.
 The following steps are performed:
 
-* the financial indicators are "factor"", while we would want to have them as numeric for analysis. Therefore this data is transformed.
+* the financial indicators are "factor, while we would want to have them as numeric for analysis. Therefore this data is transformed.
 * We also understand that there are "unknown" data in several variables. We could replace these with NAs; however some algorithms (like Naive Bayes) would struggle. Given that on some of these variables there are many unknowns (like for ```pdays```) we will leave the unknown observations as an own category "unknown".   
 * The variable ```pdays``` has a value of 999 for 'not available'; wee will set this to "unknown" as well.
 
@@ -31,6 +33,9 @@ Also the data set is split into a training set (80%) and a test set (20%).
 
 ```{r load data}
 library(caret)
+library(pROC)
+library(klaR)
+library(dplyr)
 bank.raw <- read.csv2(file="bank-additional-full.csv")
 str(bank.raw)
 bank <- bank.raw
@@ -52,22 +57,25 @@ bank.test <- bank[-trainIndex,]
 
 ```
 
-# Data Exploration
-
-Visual exploration 
-
-```{r explo}
-library(vcd)
-mosaic(  ~  success+poutcome, data=bank, shade=TRUE, main="Success of campaign vs previous successes")
-hist(bank$euribor3m)
-library(ggplot2)
-ggplot(data=bank, aes(x=euribor3m, fill=success)) + geom_histogram(alpha=0.5, position="dodge")
-```
 
 # Modelling
 
+We do not perform any feature engineering resp. feature selction. This, however, would be an important step, as can be seen in [Mores, Cortez, Rita].   
+
+We will fit the following models using the ```caret```-package:
+
+1. CART
+2. C50
+3. Conditional Inference Trees
+4. Logistic Regression
+5. Naive Bayes
+6. Neural Net
+
+10-fold cross-validation is performed on the traing set. The choice of model parameters is optimzed with regards to ROC.  
+
+The final evaluation happens based on the "area under the ROC-curve" AUC on the test set.  
+
 ```{r modeling}
-Sys.time()
 bank.train.data <- subset(bank.train, select=-c(success), drop=TRUE)
 bank.train.class <- subset(bank.train, select=c(success), drop=TRUE)
 bank.test.data <- subset(bank.test, select=-c(success), drop=TRUE)
@@ -75,10 +83,10 @@ bank.test.class <- subset(bank.test, select=c(success), drop=TRUE)
 
 
 cvCtrl <- trainControl(method="cv", classProbs=TRUE, summaryFunction=twoClassSummary, verboseIter=TRUE)
-#splCtrl <- trainControl(method="none", classProbs = TRUE)
 
 
-fit.rpart <- train(bank.train.data, bank.train.class, method="rpart", trControl=cvCtrl, metric="ROC", tuneLength = 10)
+#fit.rpart <- train(bank.train.data, bank.train.class, method="rpart", trControl=cvCtrl, metric="ROC", tuneLength = 10)
+load("CART_CV_10Iter.RData")
 predict.rpart <- predict(fit.rpart)
 confusionMatrix(predict.rpart, bank.train.class, positive="yes")
 predict.rpart <- predict(fit.rpart, type = "prob")
@@ -141,6 +149,7 @@ predict.nn <- predict(fit.nn, type = "prob")
 predict.nn <- predict(fit.nn, bank.test.dummy, type="prob")
 (auc.nn <- auc(bank.test.class, predict.nn$yes))
 
+rm(list=c("fit.ctree", "fit.logit", "fit.nb", "fit.nn", "fit.rpart"))
 
 plot.roc(bank.test.class, predict.rpart$yes, col="green")
 lines.roc(bank.test.class, predict.c50$yes, col="blue")
@@ -156,32 +165,14 @@ auc <- data.frame(Model=row.names(auc), AUC=auc)
 (auc <- arrange(auc, desc(AUC)))
 
 
-Sys.time()
-plot(varImp(fit.rpart))
-plot(varImp(fit.c50))
-plot(varImp(fit.ctree))
-plot(varImp(fit.nb))
-plot(varImp(fit.logit))
-plot(varImp(fit.nn))
+# plot(varImp(fit.rpart))
+plot(varImp(fit.c50, metric="splits"), main="Attribute usage for C50")
+# plot(varImp(fit.ctree))
+# plot(varImp(fit.nb))
+# plot(varImp(fit.logit))
+# plot(varImp(fit.nn))
 ```
 
-
-
-```{r compare}
-#compare different models
-modelObjects <- list(cart=fit.rpart,
-                     c50=fit.c50,
-                     ctree=fit.ctree,
-                     nb=fit.nb,
-                     logit=fit.logit,
-                     nn=fit.nn)
-#predict(modelObjects, churnTrain)
-
-x <- data.frame(ROC=sort(sapply(modelObjects, function(x) max(x$results$ROC)), decreasing=TRUE))
-x
-# variances in resamples.
-cvValues <- resamples(list(CART=fit.rpart, C50=fit.c50, ctree=fit.ctree, logit=fit.logit, naivebayes=fit.nb, neuralnet=fit.nn))
-summary(cvValues)
-dotplot(cvValues)
-```
+It can be seen that C50 performs best, in-sample and out-of-sample. It shows an AUC of `r round(auc.c50[1], digits=2)`.
+A plot of variable importance shows that ```age, the interest rate (3-month EURIBOR), previous campaign success, the job class and education``` are important variables for the model.
 
