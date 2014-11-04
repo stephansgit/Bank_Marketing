@@ -7,11 +7,16 @@ output:
   pandoc_args: [ +RTS, -K64m, -RTS ]
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning=FALSE, message=FALSE, eval=FALSE)
+```
+
 # Introduction
 
 The data investigated in this small workbook goes back to _S. Moro, P. Cortez and P. Rita. A Data-Driven Approach to Predict the Success of Bank Telemarketing. Decision Support Systems, Elsevier, 62:22-31, June 2014_  
-The data is available from the [UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/datasets/Bank+Marketing). Several data sets are available; we will use the ```bank-additional-full.csv```.
-An earlier paper from the authors is _Moro, Cortez, Laureano: A data mining approach for bank telemarketing using the rminer package and r tool_ [here](http://bru-unide.iscte.pt/RePEc/pdfs/13-06.pdf).
+The data is available from the [UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/datasets/Bank+Marketing).  
+Several data sets are available; we will use ```bank-additional-full.csv```.  
+An earlier paper from the authors is [_Moro, Cortez, Laureano: A data mining approach for bank telemarketing using the rminer package and r tool_](http://bru-unide.iscte.pt/RePEc/pdfs/13-06.pdf), which is free for download.
 
 The purpose of this workbook to apply different machine learning algorithms to the data problem. The software ```R``` will be used in conjunction with the package ```caret```.
 
@@ -27,7 +32,7 @@ The following steps are performed:
 * The variable ```pdays``` has a value of 999 for 'not available'; wee will set this to "unknown" as well.
 
 One important change we make is with regards to the the variable ```duration```. It indicates the length of a call. This might be interesting for analysis, but difficult for prediction: In a prediction task we do not know the duration of the call before it actually takes place.  
-Therefore ```duration``` is being excluded from the set of predictors; this seems to be different from a lot of other research on this data set.  
+Therefore ```duration``` is being excluded from the set of predictors. Researchers who included it found this variable to be higly predictive (which is not surprising).  
 
 Also the data set is split into a training set (80%) and a test set (20%). 
 
@@ -85,8 +90,8 @@ bank.test.class <- subset(bank.test, select=c(success), drop=TRUE)
 cvCtrl <- trainControl(method="cv", classProbs=TRUE, summaryFunction=twoClassSummary, verboseIter=TRUE)
 
 
-#fit.rpart <- train(bank.train.data, bank.train.class, method="rpart", trControl=cvCtrl, metric="ROC", tuneLength = 10)
-load("CART_CV_10Iter.RData")
+fit.rpart <- train(bank.train.data, bank.train.class, method="rpart", trControl=cvCtrl, metric="ROC", tuneLength = 10)
+#load("CART_CV_10Iter.RData")
 predict.rpart <- predict(fit.rpart)
 confusionMatrix(predict.rpart, bank.train.class, positive="yes")
 predict.rpart <- predict(fit.rpart, type = "prob")
@@ -96,8 +101,8 @@ predict.rpart <- predict(fit.rpart, bank.test.data, type = "prob")
 
 
 
-#fit.c50 <- train(bank.train.data, bank.train.class, method="C5.0", trControl=cvCtrl, metric="ROC", tuneLength = 10)
-load(file="C50_CV_10Iter.RData")
+fit.c50 <- train(bank.train.data, bank.train.class, method="C5.0", trControl=cvCtrl, metric="ROC", tuneLength = 10)
+#load(file="C50_CV_10Iter.RData")
 predict.c50 <- predict(fit.c50)
 confusionMatrix(predict.c50, bank.train.class, positive="yes")
 predict.c50 <- predict(fit.c50, type = "prob")
@@ -106,8 +111,8 @@ predict.c50 <- predict(fit.c50, bank.test.data, type="prob")
 (auc.c50 <- auc(bank.test.class, predict.c50$yes))
 
 
-#fit.ctree <- train(bank.train.data, bank.train.class, method="ctree", trControl=cvCtrl, metric="ROC")
-load(file = "Ctree_CV_10Iter.RData")
+fit.ctree <- train(bank.train.data, bank.train.class, method="ctree", trControl=cvCtrl, metric="ROC")
+#load(file = "Ctree_CV_10Iter.RData")
 predict.ctree <- predict(fit.ctree)
 confusionMatrix(predict.ctree, bank.train.class, positive="yes")
 predict.ctree <- predict(fit.ctree, type = "prob")
@@ -121,8 +126,8 @@ bank.test.dummy <- predict(dummyVars(success ~ . ,data=bank.test), newdata=bank.
 bank.test.dummy <- data.frame(bank.test.dummy, success=factor(bank.test$success))
 
 
-#fit.logit <- train(success ~ ., data=bank.train.dummy, method="glm", family=binomial, trControl=cvCtrl, metric="ROC", tuneLength=1)
-load(file = "Logit_CV_10Iter.RData")
+fit.logit <- train(success ~ ., data=bank.train.dummy, method="glm", family=binomial, trControl=cvCtrl, metric="ROC", tuneLength=1)
+#load(file = "Logit_CV_10Iter.RData")
 predict.logit <- predict.train(fit.logit)
 confusionMatrix(predict.logit, bank.train.class, positive="yes")
 predict.logit <- predict(fit.logit, type = "prob")
@@ -130,8 +135,8 @@ predict.logit <- predict(fit.logit, type = "prob")
 predict.logit <- predict(fit.logit, bank.test.dummy, type="prob")
 (auc.logit <- auc(bank.test.dummy$success, predict.logit$yes))
 
-#fit.nb <- train(bank.train.data, bank.train.class, method="nb", trControl=cvCtrl, metric="ROC", tuneLength=10)
-load(file = "NB_CV_10Iter.RData")
+fit.nb <- train(bank.train.data, bank.train.class, method="nb", trControl=cvCtrl, metric="ROC", tuneLength=10)
+#load(file = "NB_CV_10Iter.RData")
 predict.nb <- predict(fit.nb)
 confusionMatrix(predict.nb, bank.train.class, positive="yes")
 predict.nb <- predict(fit.nb, type = "prob")
@@ -140,8 +145,8 @@ predict.nb <- predict(fit.nb, bank.test.data, type="prob")
 (auc.nb <- auc(bank.test.class, predict.nb$yes))
 
 
-#fit.nn <- train(success ~ ., data=bank.train.dummy, method="nnet", trControl=cvCtrl, metric="ROC", tuneLength=10)
-load(file = "NN_CV_10Iter.RData")
+fit.nn <- train(success ~ ., data=bank.train.dummy, method="nnet", trControl=cvCtrl, metric="ROC", tuneLength=10)
+#load(file = "NN_CV_10Iter.RData")
 predict.nn <- predict(fit.nn)
 confusionMatrix(predict.nn, bank.train.class, positive="yes")
 predict.nn <- predict(fit.nn, type = "prob")
@@ -149,8 +154,15 @@ predict.nn <- predict(fit.nn, type = "prob")
 predict.nn <- predict(fit.nn, bank.test.dummy, type="prob")
 (auc.nn <- auc(bank.test.class, predict.nn$yes))
 
-rm(list=c("fit.ctree", "fit.logit", "fit.nb", "fit.nn", "fit.rpart"))
+#rm(list=c("fit.ctree", "fit.logit", "fit.nb", "fit.nn", "fit.rpart"))
 
+```
+
+
+```{r evaluate, eval=TRUE}
+load(file="Banking.RData")
+library(pROC)
+library(caret)
 plot.roc(bank.test.class, predict.rpart$yes, col="green")
 lines.roc(bank.test.class, predict.c50$yes, col="blue")
 lines.roc(bank.test.class, predict.ctree$yes, col="pink")
@@ -160,8 +172,8 @@ lines.roc(bank.test.class, predict.nn$yes, col="cyan")
 legend("bottomright", legend=c("CART", "C50", "Cond. Inference Trees", "Naive Bayes", "Logit", "Neural Net"), col=c("green", "blue", "pink", "red", "orange", "cyan"), lwd=2, cex=0.5)
 
 library(dplyr)
-auc <- rbind(C50=auc.c50, CART=auc.rpart, ctree=auc.ctree, Logit=auc.logit, NaiveBayes=auc.nb, NeuralNet=auc.nn)
-auc <- data.frame(Model=row.names(auc), AUC=auc)
+#auc <- rbind(C50=auc.c50, CART=auc.rpart, ctree=auc.ctree, Logit=auc.logit, NaiveBayes=auc.nb, NeuralNet=auc.nn)
+#auc <- data.frame(Model=row.names(auc), AUC=auc)
 (auc <- arrange(auc, desc(AUC)))
 
 
@@ -171,8 +183,10 @@ plot(varImp(fit.c50, metric="splits"), main="Attribute usage for C50")
 # plot(varImp(fit.nb))
 # plot(varImp(fit.logit))
 # plot(varImp(fit.nn))
+
 ```
 
-It can be seen that C50 performs best, in-sample and out-of-sample. It shows an AUC of `r round(auc.c50[1], digits=2)`.
-A plot of variable importance shows that ```age, the interest rate (3-month EURIBOR), previous campaign success, the job class and education``` are important variables for the model.
+
+It can be seen that C50 performs best, in-sample and out-of-sample. It shows an AUC of `r round(auc[1,2], digits=2)`.
+A plot of variable importance shows that ```age```, the interest rate (```3-month EURIBOR```), previous ```campaign success```, the ```job class``` and ```education``` are important variables for the model.
 
