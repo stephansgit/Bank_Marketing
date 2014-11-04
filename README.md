@@ -6,4 +6,4 @@ An earlier paper from the authors is ___Moro, Cortez, Laureano: A data mining ap
 
 The purpose of this workbook to apply different machine learning algorithms to the data problem. The software ```R``` will be used in conjunction with the package ```caret```.
 
-The workbook can be found [here](stephansgit.github.io/Bank_Marketing)
+The workbook can be found [here](http://stephansgit.github.io/Bank_Marketing)
