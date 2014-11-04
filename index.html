@@ -72,7 +72,7 @@ if (window.hljs && document.readyState && document.readyState === "complete") {
 <li>We also understand that there are “unknown” data in several variables. We could replace these with NAs; however some algorithms (like Naive Bayes) would struggle. Given that on some of these variables there are many unknowns (like for <code>pdays</code>) we will leave the unknown observations as an own category “unknown”.<br /></li>
 <li>The variable <code>pdays</code> has a value of 999 for ‘not available’; wee will set this to “unknown” as well.</li>
 </ul>
-<p>One important change we make is with regards to the the variable <code>duration</code>. It indicates the length of a call. This might be interesting for analysis, but difficult for prediction: In a prediction task we do not know the duration of the call before it actually takes place.<br />Therefore <code>duration</code> is being excluded from the set of predictors. Researchers who included it found this variable to be higly predictive (which is not surprising).</p>
+<p>One important change we make is with regards to the the variable <code>duration</code>. It indicates the length of a call. This might be interesting for analysis, but difficult for prediction: In a prediction task we do not know the duration of a call before it actually takes place.<br />Therefore <code>duration</code> is being excluded from the set of predictors. Researchers who included it found this variable to be higly predictive (which is not surprising).</p>
 <p>Also the data set is split into a training set (80%) and a test set (20%).</p>
 <pre class="r"><code>library(caret)
 library(pROC)
